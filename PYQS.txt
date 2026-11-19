@@ -1,0 +1,660 @@
+================== PAGE 1 ==================
+
+Software Engineering Lab Internal II — SET-9 Solutions
+Page 1
+ KESHAV MEMORIAL INSTITUTE OF TECHNOLOGY
+ SOFTWARE ENGINEERING LAB
+ SET-9 — LAB INTERNAL II
+ Practical Solutions, Commands, Configuration Guidance
+ and Scenario-Based Answers
+ Subject: Software Engineering (23CC501PC)
+ Year / Semester: III / I
+Academic Year: 2026–2027
+ Based on the uploaded SET-9 question paper. Includes all four 25-mark practicals and
+ all twenty scenario-based answers.
+
+
+================== PAGE 2 ==================
+
+Software Engineering Lab Internal II — SET-9 Solutions
+Page 2
+How to use this solution guide
+This guide follows the four experiments and task wording in the SET-9 question paper. Each experiment is
+organized into: objective, where to work, practical procedure, important checks, and answers to the five
+scenario-based questions.
+Important before the lab: The paper names the Apartment Management System repository:
+https://github.com/sarasrija/ApartmentSystem.git. The exact Java version, Maven packaging (WAR/JAR), Tomcat version,
+branch name, database use, and application configuration must be confirmed from that repository. The sample configurations
+below assume a compatible Maven WAR application where indicated. Do not assume those details if the repository differs.
+Quick map — where each task is performed
+Experiment
+Main tools / location
+1. Jenkins
+Windows CMD/PowerShell, VS Code, Jenkins browser, GitHub website, ngrok, Tomcat
+2. AWS EC2
+AWS Console, Windows PowerShell for SSH, Ubuntu EC2 terminal, browser
+3. Kubernetes
+Windows PowerShell, Docker Desktop, Minikube, kubectl, browser; Docker for Nagios
+4. Docker Compose
+Windows CMD/PowerShell, VS Code, Docker Desktop, browser, PostgreSQL CLI
+Repository and basic preparation
+git clone https://github.com/sarasrija/ApartmentSystem.git
+cd ApartmentSystem
+dir
+Open the folder in VS Code and inspect the README, pom.xml, source folders, and any database configuration.
+If pom.xml exists, check its packaging and Java version before choosing Maven and Tomcat commands.
+mvn -version
+mvn clean package
+A successful Maven package commonly places its artifact under target/. A WAR application produces a .war file;
+a JAR application produces a .jar file. Use the artifact type actually produced by the project.
+1. Jenkins — Web Application Build and Continuous
+Integration
+Marks: 25. Goal: Clone the repository, configure Tomcat, build and test with Jenkins, deploy the application,
+connect GitHub webhook through ngrok, and create a Pipeline View.
+Where to do each part
+Task
+Where
+Clone / inspect project; create Jenkinsfile
+Windows CMD or PowerShell; VS Code
+Configure jobs, tools and triggers
+Jenkins browser at http://localhost:8080
+Create webhook
+GitHub repository → Settings → Webhooks
+Expose local Jenkins
+ngrok terminal on Windows
+Deploy WAR
+Tomcat webapps folder / Jenkins deployment stage
+View pipeline stages
+Jenkins dashboard / Pipeline Stage View
+Practical procedure
+Step 1 — Clone and inspect the repository
+
+
+================== PAGE 3 ==================
+
+Software Engineering Lab Internal II — SET-9 Solutions
+Page 3
+cd C:\
+git clone https://github.com/sarasrija/ApartmentSystem.git
+cd ApartmentSystem
+code .
+Check whether pom.xml exists. Confirm the default Git branch in GitHub. Do not assume it is main; use the actual
+branch name.
+Step 2 — Check Maven and build locally
+mvn -version
+mvn clean package
+Resolve any local build errors before configuring Jenkins. Check the generated artifact in target/. If tests are part
+of the project, Maven's package lifecycle normally runs them before packaging.
+Step 3 — Configure Jenkins tools and plugins
+ Open http://localhost:8080 and sign in.
+ Under Manage Jenkins → Plugins, ensure Git and Pipeline support are installed. Install Pipeline: Stage View if a
+stage visualization is required.
+ Under Manage Jenkins → Tools, configure a JDK and Maven installation. Record the exact installation names
+because the Jenkinsfile refers to them.
+ Create a Pipeline job: Dashboard → New Item → enter ApartmentSystem-Pipeline → Pipeline → OK.
+Step 4 — Add a Jenkinsfile
+Create a file named Jenkinsfile in the repository root. The following is a Windows-agent example for a Maven
+WAR project. Replace tool names and branch name with the values configured in your Jenkins instance and
+repository.
+pipeline {
+    agent any
+    tools {
+        jdk 'JDK'
+        maven 'Maven'
+    }
+    stages {
+        stage('Build') {
+            steps {
+                bat 'mvn clean compile'
+            }
+        }
+        stage('Test') {
+            steps {
+                bat 'mvn test'
+            }
+        }
+        stage('Package') {
+            steps {
+                bat 'mvn package'
+            }
+        }
+    }
+}
+If Jenkins runs on Linux, use sh 'mvn ...' instead of bat 'mvn ...'. If Jenkins checks out source through Pipeline script from
+SCM, Jenkins performs the checkout automatically. Alternatively, add an explicit checkout stage, but avoid unintentionally
+duplicating checkout.
+Step 5 — Configure Pipeline from SCM
+ Open the pipeline job → Configure.
+ Under Pipeline, choose Pipeline script from SCM.
+
+
+================== PAGE 4 ==================
+
+Software Engineering Lab Internal II — SET-9 Solutions
+Page 4
+ SCM: Git; Repository URL: https://github.com/sarasrija/ApartmentSystem.git.
+ Set the actual branch and Script Path to Jenkinsfile.
+ Save and select Build Now once to verify the pipeline.
+Step 6 — Configure ngrok and GitHub webhook
+ngrok http 8080
+Keep the ngrok terminal open. Copy the HTTPS forwarding address displayed by ngrok. In GitHub: repository →
+Settings → Webhooks → Add webhook. Set Payload URL to the ngrok HTTPS address followed by
+/github-webhook/, content type to application/json, select push events, and enable the webhook. In the Jenkins
+job, enable the GitHub push trigger (the exact checkbox wording depends on installed plugins).
+Step 7 — Test webhook
+ Make a small harmless change, commit it and push it to the configured branch.
+ Check the GitHub webhook's recent delivery status.
+ Check Jenkins Build History and Console Output for a newly triggered build.
+ If it does not trigger, verify ngrok is still running, the forwarding URL is current, the webhook URL has the correct
+path, Jenkins is reachable through the tunnel, and the job trigger is enabled.
+Step 8 — Configure Tomcat deployment
+For a WAR application, configure a compatible Tomcat version and deploy the generated WAR into Tomcat's
+webapps directory, or configure a Jenkins deployment stage/plugin. A simple manual deployment copies
+target/.war to TOMCAT_HOME/webapps and starts Tomcat. The URL is typically http://localhost:8080//. If the
+WAR is named ROOT.war, the context path is /.
+# Example Windows copy command — replace paths and WAR name
+copy target\ApartmentSystem.war C:\apache-tomcat\webapps\
+The sample copy command is manual deployment, not an automated Jenkins deployment stage. For a fully automated
+deployment, configure a Tomcat Manager deployment mechanism or a suitable deployment plugin and add the deployment
+stage after successful tests and packaging. Do not expose Tomcat Manager credentials in source control.
+Step 9 — Create Pipeline View
+ Install Pipeline: Stage View if it is not already installed.
+ Return to the Jenkins dashboard and choose Add View / the + option.
+ Create a view with a suitable name, select the pipeline job, and save.
+ Open the view to see stage/build results. The exact view creation options depend on the installed view plugin.
+Scenario-based answers
+Q1. After setting up the GitHub webhook, Jenkins does not trigger automatically. What simple check
+should be performed on ngrok?
+Check that the ngrok terminal session is still running and shows an active HTTPS forwarding URL pointing to the
+local Jenkins port (usually localhost:8080). If ngrok has stopped, GitHub cannot reach the local Jenkins server
+through that tunnel.
+Q2. How does Jenkins display compilation errors in the console output when a Java syntax mistake is
+made?
+The Maven build output in Jenkins Console Output shows a compilation failure, usually including the Java source
+filename, line number, and compiler error description. The build is marked as FAILURE.
+Q3. If Maven compiles files successfully but a unit test fails, will Jenkins still create the WAR file?
+
+
+================== PAGE 5 ==================
+
+Software Engineering Lab Internal II — SET-9 Solutions
+Page 5
+In a pipeline where the Test stage runs before Package and the pipeline stops on a failed command, no. Maven
+reports the test failure, Jenkins marks the build as FAILURE, and the later Package stage is skipped. If the
+pipeline is deliberately configured to ignore test failures or continue after failure, behavior can differ.
+Q4. Why is ngrok necessary when connecting a local Jenkins server to GitHub webhooks?
+A Jenkins server running on localhost is not directly reachable from the public internet. Ngrok creates a public
+HTTPS tunnel that forwards GitHub webhook requests to the local Jenkins server.
+Q5. What is the difference between Continuous Integration and Continuous Deployment?
+Continuous Integration (CI) means developers frequently merge changes into a shared repository and each
+change is automatically built and tested. Continuous Deployment means changes that pass the required
+checks are automatically released to the production environment without a manual deployment approval step.
+
+
+================== PAGE 6 ==================
+
+Software Engineering Lab Internal II — SET-9 Solutions
+Page 6
+2. AWS — Cloud Deployment using EC2
+Marks: 25. Goal: Launch an Ubuntu EC2 instance, connect with an SSH key, install Docker and Git, clone the
+repository, build a Docker image, run a detached container with host port 8090 mapped to the container's Tomcat
+port, and access it through the EC2 public IP.
+Where to do each part
+Task
+Where
+Launch EC2 and configure Security Group
+AWS Management Console → EC2
+SSH connection
+Windows PowerShell
+Install packages, clone, build and run Docker
+Ubuntu terminal on EC2
+Test deployed site
+Browser on your computer
+Practical procedure
+Step 1 — Launch EC2
+ Open AWS Console → EC2 → Launch instance.
+ Name it ApartmentSystem; choose an Ubuntu Server AMI.
+ Choose t2.micro only if it is available and eligible under the account's current free-tier offer. AWS pricing and
+free-tier eligibility can vary.
+ Create/download a key pair in .pem format and keep it private.
+ Configure an inbound Security Group rule for SSH (TCP 22) restricted to My IP, and a TCP 8090 rule for the
+intended test audience. For a public demonstration, source 0.0.0.0/0 exposes the application to the internet;
+restrict it where possible.
+ Launch the instance and note its public IPv4 address.
+Step 2 — Connect using SSH
+# In Windows PowerShell; go to the folder containing the .pem file
+cd $HOME\Downloads
+ssh -i "your-key.pem" ubuntu@YOUR-EC2-PUBLIC-IP
+Replace the key filename and public IP. If Windows reports a key-permission error, restrict the key file's
+permissions before retrying.
+Step 3 — Update Ubuntu and install Docker and Git
+sudo apt update
+sudo apt upgrade -y
+sudo apt install docker.io git -y
+sudo systemctl start docker
+sudo systemctl enable docker
+docker --version
+git --version
+To use Docker without typing sudo, run sudo usermod -aG docker ubuntu and then log out and reconnect so the
+new group membership takes effect. Until then, use sudo docker.
+Step 4 — Clone the project
+git clone https://github.com/sarasrija/ApartmentSystem.git
+cd ApartmentSystem
+ls
+
+
+================== PAGE 7 ==================
+
+Software Engineering Lab Internal II — SET-9 Solutions
+Page 7
+Inspect the project files and confirm whether it is a Maven WAR application. Confirm the Java version, packaging
+and compatible Tomcat version.
+Step 5 — Create a Dockerfile
+Example only: this multi-stage Dockerfile is for a compatible Java 17 Maven WAR application and Tomcat 9.
+Adjust versions to match the repository.
+FROM maven:3.9-eclipse-temurin-17 AS build
+WORKDIR /app
+COPY . .
+RUN mvn clean package -DskipTests
+FROM tomcat:9.0-jdk17-temurin
+COPY --from=build /app/target/*.war /usr/local/tomcat/webapps/ROOT.war
+EXPOSE 8080
+CMD ["catalina.sh", "run"]
+The example skips tests inside the Docker build for demonstration. In a proper CI workflow, run tests before
+building/deploying the image. If the repository produces a JAR or uses a different runtime, this Dockerfile is not appropriate
+without changes.
+Step 6 — Build the image
+sudo docker build -t apartment-app . 
+sudo docker images
+Step 7 — Run the container in detached mode
+sudo docker run -d --name apartment-container -p 8090:8080 apartment-app
+sudo docker ps
+The mapping -p 8090:8080 means host/EC2 port 8090 forwards to container port 8080. Tomcat commonly listens
+on 8080 inside the container.
+Step 8 — Test using the EC2 public IP
+Open http://YOUR-EC2-PUBLIC-IP:8090/ in a browser. Confirm the EC2 Security Group allows inbound TCP
+8090 and the container is running.
+Useful troubleshooting commands
+sudo docker ps -a
+sudo docker logs apartment-container
+sudo docker logs -f apartment-container
+sudo docker restart apartment-container
+Scenario-based answers
+Q1. The container runs on port 8090 inside EC2, but the browser URL uses port 8080. What error occurs
+and which AWS setting must be updated?
+The browser may show a connection-refused or timeout error because the URL uses the wrong host port. With
+the specified mapping -p 8090:8080, browse to port 8090. Ensure the EC2 Security Group has an inbound TCP
+rule for port 8090. The container's internal port and EC2 host port are different.
+Q2. Why is leaving SSH port 22 open to everyone (0.0.0.0/0) a security risk?
+It allows any internet host to attempt SSH connections to the instance. This increases exposure to password/key
+attacks and attempts to exploit SSH vulnerabilities. Restrict SSH to trusted IP addresses, such as My IP, and use
+key-based authentication.
+Q3. What basic Linux commands refresh packages and install Docker on Ubuntu?
+Use: sudo apt update, sudo apt upgrade -y, sudo apt install docker.io -y, sudo systemctl
+start docker, and sudo systemctl enable docker. Verify with docker --version.
+Q4. If Tomcat crashes inside the running container, how can its logs be viewed?
+
+
+================== PAGE 8 ==================
+
+Software Engineering Lab Internal II — SET-9 Solutions
+Page 8
+Run docker logs apartment-container. To follow new log output continuously, run docker logs -f
+apartment-container. These logs can show startup errors, application exceptions and other diagnostic
+messages.
+Q5. How can application availability be improved?
+Run multiple application instances, place a load balancer in front of them, use health checks and automatic
+restart/recovery, monitor resource usage, maintain backups, and deploy across multiple availability zones where
+appropriate. A single EC2 instance remains a single point of failure.
+
+
+================== PAGE 9 ==================
+
+Software Engineering Lab Internal II — SET-9 Solutions
+Page 9
+3. Kubernetes — Container Deployment and Auto Scaling
+Marks: 25. Goal: Start a local Minikube cluster, deploy four replicas, expose the application with a Service, scale
+it, run Nagios, and monitor CPU, memory, disk and uptime.
+Where to do each part
+Task
+Where
+Install / start Docker Desktop, Minikube and kubectl
+Windows; PowerShell
+Create Deployment and Service YAML
+VS Code
+Apply, scale and inspect Kubernetes resources
+PowerShell using kubectl
+Run Nagios image
+Docker / PowerShell
+Open app / Nagios
+Browser
+Practical procedure
+Step 1 — Install and verify prerequisites
+Install Docker Desktop, Minikube and kubectl using their official installation instructions. Start Docker Desktop
+before starting Minikube.
+docker --version
+kubectl version --client
+minikube version
+Official references: minikube.sigs.k8s.io/docs/start/, kubernetes.io/docs/tasks/tools/, and
+docker.com/products/docker-desktop/.
+Step 2 — Start Minikube
+minikube start --driver=docker
+kubectl cluster-info
+kubectl get nodes
+Step 3 — Build and load the application image
+Build the image from the project's correct Dockerfile. For a local image used by Minikube:
+docker build -t apartment-app:v1 .
+minikube image load apartment-app:v1
+Run these commands from the folder containing the Dockerfile. Ensure the container listens on the port used
+below (8080 in this example).
+Step 4 — Create deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apartment-deployment
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: apartment
+  template:
+    metadata:
+      labels:
+        app: apartment
+    spec:
+      containers:
+      - name: apartment-container
+        image: apartment-app:v1
+        imagePullPolicy: Never
+
+
+================== PAGE 10 ==================
+
+Software Engineering Lab Internal II — SET-9 Solutions
+Page 10
+        ports:
+        - containerPort: 8080
+kubectl apply -f deployment.yaml
+kubectl get deployments
+kubectl get pods
+The four pods may take time to become Ready. Use kubectl describe pod POD_NAME and kubectl logs
+POD_NAME if a pod does not start.
+Step 5 — Create service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: apartment-service
+spec:
+  type: NodePort
+  selector:
+    app: apartment
+  ports:
+  - port: 80
+    targetPort: 8080
+    nodePort: 30080
+kubectl apply -f service.yaml
+kubectl get services
+The Service selects pods using the label app: apartment. The Service port is 80 and forwards traffic to container
+port 8080.
+Step 6 — Open the application
+minikube service apartment-service
+Minikube provides/opens the reachable service URL. Alternatively, test with port-forward:
+kubectl port-forward service/apartment-service 8080:80
+While the port-forward command is running, open http://localhost:8080/.
+Step 7 — Scale the deployment
+kubectl scale deployment apartment-deployment --replicas=6
+kubectl get pods
+This changes the desired replica count from four to six. It is manual scaling; automatic scaling requires a
+HorizontalPodAutoscaler and metrics/resource configuration.
+Step 8 — Test pod recovery
+kubectl get pods
+kubectl delete pod POD_NAME
+kubectl get pods
+Delete one pod name shown by kubectl get pods. The Deployment/ReplicaSet controller should create a
+replacement so the desired replica count is restored.
+Step 9 — Enable metrics server and inspect CPU/memory
+minikube addons enable metrics-server
+kubectl top nodes
+kubectl top pods
+Metrics may take a short time to become available. kubectl top reports CPU and memory, not disk usage or
+uptime.
+Step 10 — Pull and run Nagios
+docker pull jasonrivers/nagios:latest
+docker run -d --name nagios -p 8081:80 jasonrivers/nagios:latest
+docker ps
+
+
+================== PAGE 11 ==================
+
+Software Engineering Lab Internal II — SET-9 Solutions
+Page 11
+Open http://localhost:8081/. Check the image's documentation for the default credentials and configuration.
+Nagios must be configured with host/service checks to monitor the application; merely running the Nagios
+container does not automatically monitor all resources.
+Step 11 — Basic Linux monitoring commands
+top       # CPU and process activity
+free -h   # memory
+df -h     # disk space
+uptime    # uptime and load average
+Run these inside an appropriate Linux host/container with the relevant utilities. For persistent, centralized
+monitoring, configure Nagios plugins or another monitoring stack to collect the required checks.
+Scenario-based answers
+Q1. If one application pod crashes, how does Kubernetes maintain the required number of replicas?
+The Deployment controller manages a ReplicaSet, which continuously compares the actual number of pods with
+the desired replica count. If a pod stops, the controller creates a replacement pod to restore the desired count.
+Q2. What is the difference between a Pod IP and a Service IP?
+A Pod IP belongs to an individual pod and can change when that pod is recreated. A Service provides a stable
+virtual IP and DNS name that routes traffic to the matching healthy pods.
+Q3. Which kubectl command checks the list of pods and their statuses?
+kubectl get pods. It displays pod names, readiness, status, restart count and age.
+Q4. If the NodePort page cannot be opened directly, what kubectl port-forward command can test the app
+locally?
+Use kubectl port-forward service/apartment-service 8080:80, then open
+http://localhost:8080/ while the command remains running.
+Q5. How can Nagios identify application failure when the server is running?
+Configure an application-level service check, such as an HTTP/HTTPS check, to verify that the web endpoint
+responds as expected. The server may be up while the application is down; Nagios can report a service failure
+when the HTTP check fails or returns an unexpected result.
+
+
+================== PAGE 12 ==================
+
+Software Engineering Lab Internal II — SET-9 Solutions
+Page 12
+4. Docker Compose — Multi-Container Application
+Marks: 25. Goal: Create a compose-lab folder and docker-compose.yml (version 3.9 as specified in the paper),
+define a web service and PostgreSQL 15 service, connect them through a custom network, persist database
+records using a volume, and run/rebuild the stack.
+Where to do each part
+Task
+Where
+Create folder and files
+Windows CMD / VS Code
+Build and start services
+PowerShell / CMD with Docker Desktop running
+Inspect containers and logs
+PowerShell / CMD
+Test web application
+Browser
+Connect to PostgreSQL
+docker exec / psql terminal
+Practical procedure
+Step 1 — Create the working folder
+mkdir compose-lab
+cd compose-lab
+code .
+Create two files in this folder: docker-compose.yml and Dockerfile. The sample below assumes the web
+application is a compatible WAR application and that target/ already contains the built WAR.
+Step 2 — Create docker-compose.yml
+version: '3.9'
+services:
+  web:
+    build: .
+    container_name: apartment-web
+    ports:
+      - "8090:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - apartment-network
+  db:
+    image: postgres:15
+    container_name: apartment-db
+    environment:
+      POSTGRES_DB: apartment
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - apartment-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d apartment"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+networks:
+  apartment-network:
+    driver: bridge
+volumes:
+  postgres-data:
+
+
+================== PAGE 13 ==================
+
+Software Engineering Lab Internal II — SET-9 Solutions
+Page 13
+For a real application, do not use a simple example password such as admin123. Use a strong secret and avoid committing
+credentials to Git. Also, the application itself must be configured to connect to host db, port 5432, database apartment, and
+the chosen credentials. The Compose file does not automatically reconfigure the application's database connection.
+Step 3 — Create Dockerfile
+FROM tomcat:9.0-jdk17-temurin
+COPY target/*.war /usr/local/tomcat/webapps/ROOT.war
+EXPOSE 8080
+CMD ["catalina.sh", "run"]
+This example assumes the project has already been built and target/*.war exists. If it produces a JAR, uses
+another Java version, or is not a Tomcat application, use a matching Dockerfile instead.
+Step 4 — Build and start in detached mode
+docker compose up -d --build
+Step 5 — Verify containers and logs
+docker compose ps
+docker compose logs
+docker compose logs -f web
+docker compose logs -f db
+Step 6 — Test the web application
+Open http://localhost:8090/. Confirm that the web service is listening and that the application can reach
+PostgreSQL. If the application is not configured for PostgreSQL, the database container may be healthy but the
+application may still fail.
+Step 7 — Check PostgreSQL
+docker exec -it apartment-db psql -U admin -d apartment
+At the PostgreSQL prompt:
+\l       -- list databases
+\dt      -- list tables
+\q       -- quit
+Step 8 — Stop the stack and verify persistence
+docker compose down
+docker compose up -d
+A normal docker compose down removes the containers and Compose network but keeps the named volume.
+When the database container is recreated with the same volume, PostgreSQL can use the persisted data.
+Do not run docker compose down -v if you want to preserve the named volume. The -v option removes named volumes
+declared by the Compose project and can delete the stored database data.
+Step 9 — Rebuild after code changes
+Rebuild the application artifact if required, then run:
+docker compose up -d --build
+The --build flag asks Compose to build the image before starting/recreating services. If source code is copied into
+the image, the new image is needed for changes to appear.
+Scenario-based answers
+Q1. What is the main use of depends_on in docker-compose.yml?
+depends_on defines service startup dependencies. It tells Compose to start a dependency before the dependent
+service. With a supported health condition such as service_healthy and a configured health check, Compose can
+wait for the dependency to become healthy before starting the dependent service.
+
+
+================== PAGE 14 ==================
+
+Software Engineering Lab Internal II — SET-9 Solutions
+Page 14
+Q2. Why configure persistent volumes for databases, and what happens if volumes are left out when
+docker compose down is run?
+A persistent volume stores database files outside the container's writable layer, so data survives container
+removal and recreation. Without a persistent volume, data stored only in the container filesystem is lost when that
+container is removed. A named volume normally remains after docker compose down; docker compose down -v
+removes Compose-managed named volumes.
+Q3. Why may code changes not appear after docker compose up -d, and what flag should be added?
+The running container may still be using an image built from the old source code. Use docker compose up -d
+--build to rebuild the image and start/recreate the services with the updated image.
+Q4. How do custom networks help containers communicate using names instead of IP addresses?
+Containers attached to the same user-defined Compose network can use Docker's internal DNS service
+discovery. The web container can connect to the database using the Compose service name, such as db, rather
+than a changing container IP address.
+Q5. How can database information be recovered after container deletion?
+If the database used a persistent named volume, recreate the database container and attach the same volume.
+PostgreSQL can then read the previously stored database files. If no volume or backup exists and the only copy
+was inside the deleted container, recovery may not be possible.
+
+
+================== PAGE 15 ==================
+
+Software Engineering Lab Internal II — SET-9 Solutions
+Page 15
+Final revision sheet
+Most important commands
+Task
+Command
+Clone repository
+git clone https://github.com/sarasrija/ApartmentSystem.git
+Maven package
+mvn clean package
+Start ngrok
+ngrok http 8080
+Install Docker on Ubuntu
+sudo apt install docker.io -y
+Build Docker image
+docker build -t apartment-app .
+Run container with port mapping
+docker run -d --name apartment-container -p 8090:8080 apartment-app
+View container logs
+docker logs apartment-container
+Start Minikube
+minikube start --driver=docker
+Apply Kubernetes YAML
+kubectl apply -f deployment.yaml
+List pods
+kubectl get pods
+Scale Deployment
+kubectl scale deployment apartment-deployment --replicas=6
+Port-forward Service
+kubectl port-forward service/apartment-service 8080:80
+Start Compose stack
+docker compose up -d --build
+Stop Compose stack
+docker compose down
+Common mistakes to avoid
+ Using the wrong Git branch or Jenkins tool installation name.
+ Forgetting to keep the ngrok terminal running or using an old ngrok forwarding URL.
+ Confusing the EC2 host port (8090) with the container port (8080).
+ Opening a port in Docker but forgetting to allow it in the EC2 Security Group.
+ Using an image name in Kubernetes that Minikube cannot access; load the local image into Minikube or use a
+registry image.
+ Assuming kubectl top reports disk usage or uptime; it reports CPU and memory metrics.
+ Assuming depends_on alone guarantees database readiness; use a health check and a supported health
+condition.
+ Running docker compose down -v when you need to retain the database volume.
+ Assuming the web application automatically connects to PostgreSQL just because both containers are running
+on the same network.
+Official documentation for checking command/version differences
+ Jenkins documentation
+ ngrok documentation
+ AWS EC2 documentation
+ Docker documentation
+
+
+================== PAGE 16 ==================
+
+Software Engineering Lab Internal II — SET-9 Solutions
+Page 16
+ Kubernetes documentation
+ Minikube documentation
+ Nagios documentation
+End of SET-9 solution guide.
